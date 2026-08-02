@@ -12,11 +12,7 @@ st.write(
 )
 st.divider()
 
-# Cargar automáticamente el token desde Secrets si existe
-if "HF_TOKEN" in st.secrets:
-    os.environ["HF_TOKEN"] = st.secrets["HF_TOKEN"]
-
-# Paso 1: Captura
+# Paso 1: Captura de Audio
 st.header("1. Captura tu ukelele")
 tab1, tab2 = st.tabs(["🎤 Grabar con micrófono", "📁 Subir archivo de audio"])
 
@@ -39,6 +35,7 @@ if audio_final:
     st.success("¡Audio listo!")
     st.audio(audio_final)
 
+    # Paso 2: Instrucción de Estilo
     st.header("2. ¿Cómo quieres que suene?")
     estilo = st.text_area(
         "Describe la producción que imaginas:",
@@ -48,74 +45,67 @@ if audio_final:
         ),
     )
 
+    # Paso 3: Generación con IA
     if st.button("✨ Transformar con IA"):
-        status_box = st.empty()
-        status_box.info("⏳ Preparando tu audio...")
-
-        # Guardamos el audio temporalmente
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-            tmp.write(audio_final.getvalue())
-            tmp_path = tmp.name
-
-        # Lista de servidores gratuitos a los que intentaremos conectarnos
-        servidores = [
-            "facebook/MusicGen",
-            "reach-vb/musicgen-melody",
-            "mrfakename/MusicGen-Melody",
-        ]
-
-        audio_generado = None
-
-        # Intentar en cada servidor de la lista hasta que uno funcione
-        for servidor in servidores:
+        with st.spinner(
+            "Usando tu cuota gratuita de ZeroGPU en Hugging Face..."
+        ):
             try:
-                status_box.info(
-                    f"🛰️ Conectando con el servidor `{servidor}`..."
-                )
-                client = Client(servidor)
+                # Guardamos el archivo de audio recibido temporalmente
+                with tempfile.NamedTemporaryFile(
+                    delete=False, suffix=".wav"
+                ) as tmp:
+                    tmp.write(audio_final.getvalue())
+                    tmp_path = tmp.name
 
+                # Obtenemos el token desde Secrets
+                hf_token = st.secrets.get("HF_TOKEN", None)
+
+                # Conexión autenticada con el parámetro 'token' correcto
+                if hf_token:
+                    client = Client("facebook/MusicGen", token=hf_token)
+                else:
+                    client = Client("facebook/MusicGen")
+
+                # Petición a la supercomputadora
                 result = client.predict(
-                    "melody",
-                    estilo,
-                    handle_file(tmp_path),
-                    8,
+                    "melody",  # Modelo con melodía de referencia
+                    estilo,  # Prompt de texto
+                    handle_file(tmp_path),  # Tu ukelele
+                    8,  # Duración en segundos
                 )
 
-                # Extraer respuesta de forma segura
-                if result:
-                    if isinstance(result, (list, tuple)) and len(result) > 0:
-                        for item in result:
-                            if isinstance(item, str) and item.endswith(
-                                (".wav", ".mp3", ".flac", ".ogg")
-                            ):
-                                audio_generado = item
-                                break
-                        if not audio_generado and isinstance(result[-1], str):
-                            audio_generado = result[-1]
-                    elif isinstance(result, str):
-                        audio_generado = result
+                # Borramos el archivo temporal
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
 
-                # Si logramos obtener un archivo real, salimos del bucle
-                if audio_generado and os.path.exists(str(audio_generado)):
-                    status_box.empty()
-                    break
+                # Extracción segura de la ruta del audio generado
+                audio_path = None
+                if isinstance(result, (list, tuple)) and len(result) > 0:
+                    for item in result:
+                        if isinstance(item, str) and item.endswith(
+                            (".wav", ".mp3", ".flac", ".ogg")
+                        ):
+                            audio_path = item
+                            break
+                    if not audio_path:
+                        audio_path = result[-1]
+                elif isinstance(result, str):
+                    audio_path = result
 
-            except Exception:
-                # Si falla o está saturado este servidor, pasa al siguiente
-                continue
+                # Mostrar el audio resultante
+                if (
+                    audio_path
+                    and isinstance(audio_path, str)
+                    and os.path.exists(audio_path)
+                ):
+                    st.success("🎉 ¡Tu canción producida por IA está lista!")
+                    st.audio(audio_path)
+                else:
+                    st.warning(
+                        "⚠️ El servidor estuvo saturado un segundo. Presiona"
+                        " el botón nuevamente."
+                    )
 
-        # Limpieza del archivo de entrada
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-
-        # Mostrar resultado final
-        if audio_generado and os.path.exists(str(audio_generado)):
-            st.success("🎉 ¡Tu canción producida por IA está lista!")
-            st.audio(audio_generado)
-        else:
-            status_box.empty()
-            st.error(
-                "⚠️ Todos los servidores gratuitos están congestionados en este"
-                " instante. Espera unos 30 segundos y vuelve a presionar el"
-                " botón."
-            )
+            except Exception as e:
+                st.error(f"Ocurrió un detalle: {e}")
