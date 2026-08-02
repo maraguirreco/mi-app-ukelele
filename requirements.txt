@@ -1,5 +1,1 @@
 streamlit
-playwright
-Pillow
-openai
-duckduckgo-search
