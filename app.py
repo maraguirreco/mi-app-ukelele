@@ -12,6 +12,10 @@ st.write(
 )
 st.divider()
 
+# Cargar automáticamente el token desde Secrets a las variables del sistema
+if "HF_TOKEN" in st.secrets:
+    os.environ["HF_TOKEN"] = st.secrets["HF_TOKEN"]
+
 # Paso 1: Captura
 st.header("1. Captura tu ukelele")
 tab1, tab2 = st.tabs(["🎤 Grabar con micrófono", "📁 Subir archivo de audio"])
@@ -54,11 +58,8 @@ if audio_final:
                     tmp.write(audio_final.getvalue())
                     tmp_path = tmp.name
 
-                # Revisar si existe el token prioritario gratuito en Secrets
-                hf_token = st.secrets.get("HF_TOKEN", None)
-
-                # Conexión pasándole el token para no ser expulsado de la fila
-                client = Client("facebook/MusicGen", hf_token=hf_token)
+                # Conexión limpia (Gradio detecta os.environ['HF_TOKEN'] automáticamente)
+                client = Client("facebook/MusicGen")
 
                 result = client.predict(
                     "melody",
