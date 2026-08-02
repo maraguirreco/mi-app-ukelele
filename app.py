@@ -8,19 +8,18 @@ st.set_page_config(page_title="UkeFlow AI Free", page_icon="🤖")
 st.title("🤖 UkeFlow: Edición IA (Gratis)")
 st.write(
     "Graba o sube tu ukelele, escribe lo que imaginas y deja que la IA"
-    " produzca la canción gratis."
+    " produzca la canción."
 )
 st.divider()
 
+# Paso 1: Captura
 st.header("1. Captura tu ukelele")
 tab1, tab2 = st.tabs(["🎤 Grabar con micrófono", "📁 Subir archivo de audio"])
 
 audio_final = None
 
 with tab1:
-    audio_grabado = st.audio_input(
-        "Toca tu ukelele (recomendado: 5 a 10 segundos):"
-    )
+    audio_grabado = st.audio_input("Toca tu ukelele (5 a 10 segundos):")
     if audio_grabado:
         audio_final = audio_grabado
 
@@ -45,64 +44,61 @@ if audio_final:
         ),
     )
 
-    if st.button("✨ Transformar con IA (Servidor Gratis)"):
-        with st.spinner(
-            "Conectando con la supercomputadora de Hugging Face (esto puede"
-            " tomar 30-60 segundos)..."
-        ):
+    if st.button("✨ Transformar con IA"):
+        with st.spinner("Procesando tu producción musical con la IA..."):
             try:
-                # Guardar el audio temporalmente
+                # Guardamos el audio temporalmente
                 with tempfile.NamedTemporaryFile(
                     delete=False, suffix=".wav"
                 ) as tmp:
                     tmp.write(audio_final.getvalue())
                     tmp_path = tmp.name
 
-                # Conexión al modelo de producción musical
-                client = Client("facebook/MusicGen")
+                # Revisar si existe el token prioritario gratuito en Secrets
+                hf_token = st.secrets.get("HF_TOKEN", None)
+
+                # Conexión pasándole el token para no ser expulsado de la fila
+                client = Client("facebook/MusicGen", hf_token=hf_token)
 
                 result = client.predict(
-                    "melody",  # Modelo con melodía
-                    estilo,  # Instrucción en texto
-                    handle_file(tmp_path),  # Audio de tu ukelele
-                    8,  # Duración del demo
+                    "melody",
+                    estilo,
+                    handle_file(tmp_path),
+                    8,
                 )
 
-                # Limpieza del archivo temporal de entrada
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
 
-                # Procesamiento ultra-seguro de la respuesta
+                # Extracción del audio resultante
                 audio_path = None
-
-                if isinstance(result, (list, tuple)):
-                    # Buscamos el archivo de audio generado
+                if isinstance(result, (list, tuple)) and len(result) > 0:
                     for item in result:
-                        if isinstance(item, str) and (
-                            item.endswith(".wav")
-                            or item.endswith(".mp3")
-                            or item.endswith(".flac")
+                        if isinstance(item, str) and item.endswith(
+                            (".wav", ".mp3", ".flac")
                         ):
                             audio_path = item
                             break
-                    if not audio_path and len(result) > 0:
+                    if not audio_path:
                         audio_path = result[-1]
                 elif isinstance(result, str):
                     audio_path = result
 
-                # Verificación final
-                if audio_path and os.path.exists(str(audio_path)):
+                if (
+                    audio_path
+                    and isinstance(audio_path, str)
+                    and os.path.exists(audio_path)
+                ):
                     st.success("🎉 ¡Tu canción producida por IA está lista!")
                     st.audio(audio_path)
                 else:
                     st.warning(
-                        "⚠️ El servidor gratuito está despertando o muy"
-                        " ocupado en este momento. Por favor presiona el botón"
-                        " de nuevo en 5 segundos."
+                        "⚠️ La cola estuvo muy llena. Si no has agregado el"
+                        " HF_TOKEN en Secrets, agrégalo para tener prioridad."
                     )
 
             except Exception as e:
                 st.error(
-                    "El servidor está saturado. Intenta presionar el botón de"
-                    f" nuevo. Detalle: {e}"
+                    f"Error de conexión: {e}. Intenta presionar el botón de"
+                    " nuevo."
                 )
