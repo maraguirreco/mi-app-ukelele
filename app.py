@@ -12,7 +12,7 @@ st.write(
 )
 st.divider()
 
-# Cargar automáticamente el token desde Secrets a las variables del sistema
+# Cargar automáticamente el token desde Secrets si existe
 if "HF_TOKEN" in st.secrets:
     os.environ["HF_TOKEN"] = st.secrets["HF_TOKEN"]
 
@@ -49,17 +49,30 @@ if audio_final:
     )
 
     if st.button("✨ Transformar con IA"):
-        with st.spinner("Procesando tu producción musical con la IA..."):
-            try:
-                # Guardamos el audio temporalmente
-                with tempfile.NamedTemporaryFile(
-                    delete=False, suffix=".wav"
-                ) as tmp:
-                    tmp.write(audio_final.getvalue())
-                    tmp_path = tmp.name
+        status_box = st.empty()
+        status_box.info("⏳ Preparando tu audio...")
 
-                # Conexión limpia (Gradio detecta os.environ['HF_TOKEN'] automáticamente)
-                client = Client("facebook/MusicGen")
+        # Guardamos el audio temporalmente
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+            tmp.write(audio_final.getvalue())
+            tmp_path = tmp.name
+
+        # Lista de servidores gratuitos a los que intentaremos conectarnos
+        servidores = [
+            "facebook/MusicGen",
+            "reach-vb/musicgen-melody",
+            "mrfakename/MusicGen-Melody",
+        ]
+
+        audio_generado = None
+
+        # Intentar en cada servidor de la lista hasta que uno funcione
+        for servidor in servidores:
+            try:
+                status_box.info(
+                    f"🛰️ Conectando con el servidor `{servidor}`..."
+                )
+                client = Client(servidor)
 
                 result = client.predict(
                     "melody",
@@ -68,38 +81,41 @@ if audio_final:
                     8,
                 )
 
-                if os.path.exists(tmp_path):
-                    os.remove(tmp_path)
+                # Extraer respuesta de forma segura
+                if result:
+                    if isinstance(result, (list, tuple)) and len(result) > 0:
+                        for item in result:
+                            if isinstance(item, str) and item.endswith(
+                                (".wav", ".mp3", ".flac", ".ogg")
+                            ):
+                                audio_generado = item
+                                break
+                        if not audio_generado and isinstance(result[-1], str):
+                            audio_generado = result[-1]
+                    elif isinstance(result, str):
+                        audio_generado = result
 
-                # Extracción del audio resultante
-                audio_path = None
-                if isinstance(result, (list, tuple)) and len(result) > 0:
-                    for item in result:
-                        if isinstance(item, str) and item.endswith(
-                            (".wav", ".mp3", ".flac")
-                        ):
-                            audio_path = item
-                            break
-                    if not audio_path:
-                        audio_path = result[-1]
-                elif isinstance(result, str):
-                    audio_path = result
+                # Si logramos obtener un archivo real, salimos del bucle
+                if audio_generado and os.path.exists(str(audio_generado)):
+                    status_box.empty()
+                    break
 
-                if (
-                    audio_path
-                    and isinstance(audio_path, str)
-                    and os.path.exists(audio_path)
-                ):
-                    st.success("🎉 ¡Tu canción producida por IA está lista!")
-                    st.audio(audio_path)
-                else:
-                    st.warning(
-                        "⚠️ La cola estuvo muy llena. Si no has agregado el"
-                        " HF_TOKEN en Secrets, agrégalo para tener prioridad."
-                    )
+            except Exception:
+                # Si falla o está saturado este servidor, pasa al siguiente
+                continue
 
-            except Exception as e:
-                st.error(
-                    f"Error de conexión: {e}. Intenta presionar el botón de"
-                    " nuevo."
-                )
+        # Limpieza del archivo de entrada
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+        # Mostrar resultado final
+        if audio_generado and os.path.exists(str(audio_generado)):
+            st.success("🎉 ¡Tu canción producida por IA está lista!")
+            st.audio(audio_generado)
+        else:
+            status_box.empty()
+            st.error(
+                "⚠️ Todos los servidores gratuitos están congestionados en este"
+                " instante. Espera unos 30 segundos y vuelve a presionar el"
+                " botón."
+            )
