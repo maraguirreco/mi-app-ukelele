@@ -7,8 +7,8 @@ st.set_page_config(page_title="UkeFlow AI Free", page_icon="🤖")
 
 st.title("🤖 UkeFlow: Edición IA (Gratis)")
 st.write(
-    "Graba o sube tu ukelele, escribe lo que imaginas y deja que la IA produce"
-    " la canción gratis."
+    "Graba o sube tu ukelele, escribe lo que imaginas y deja que la IA"
+    " produzca la canción de forma gratuita."
 )
 st.divider()
 
@@ -50,14 +50,14 @@ if audio_final:
             "Enviando a la supercomputadora gratuita de Hugging Face..."
         ):
             try:
-                # Guardamos el audio temporalmente en disco
+                # Guardamos el audio temporalmente para procesarlo
                 with tempfile.NamedTemporaryFile(
                     delete=False, suffix=".wav"
                 ) as tmp:
                     tmp.write(audio_final.getvalue())
                     tmp_path = tmp.name
 
-                # Nos conectamos al servidor gratuito de MusicGen
+                # Conexión directa a MusicGen en Hugging Face
                 client = Client("facebook/MusicGen")
 
                 result = client.predict(
@@ -71,7 +71,7 @@ if audio_final:
                 # Limpieza del archivo temporal
                 os.remove(tmp_path)
 
-                # result devuelve la ruta del audio generado
+                # Obtenemos la ruta del audio generado
                 audio_path = result[1] if isinstance(result, tuple) else result
 
                 st.success("🎉 ¡Tu canción producida por IA está lista!")
@@ -79,6 +79,6 @@ if audio_final:
 
             except Exception as e:
                 st.error(
-                    "El servidor gratuito está algo congestionado en este"
-                    f" momento. Error: {e}"
+                    "El servidor gratuito puede estar congestionado en este"
+                    f" momento. Intenta de nuevo en un par de segundos. Error: {e}"
                 )
