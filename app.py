@@ -56,11 +56,14 @@ if audio_grabado:
             tempo, _ = librosa.beat.beat_track(y=y_uke, sr=sr_uke)
 
             bpm_valor = float(np.atleast_1d(tempo)[0])
+
+            # Guardamos la información completa en la memoria
             st.session_state["bpm"] = int(np.round(bpm_valor))
             st.session_state["y_uke"] = y_uke
             st.session_state["sr"] = sr_uke
 
-if "bpm" in st.session_state:
+# Verificamos que AMBAS variables existan en la memoria antes de continuar
+if "bpm" in st.session_state and "y_uke" in st.session_state:
     bpm = st.session_state["bpm"]
     y_uke = st.session_state["y_uke"]
     sr = st.session_state["sr"]
