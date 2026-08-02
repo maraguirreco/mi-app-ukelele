@@ -8,7 +8,7 @@ st.set_page_config(page_title="UkeFlow AI Free", page_icon="🤖")
 st.title("🤖 UkeFlow: Edición IA (Gratis)")
 st.write(
     "Graba o sube tu ukelele, escribe lo que imaginas y deja que la IA"
-    " produzca la canción de forma gratuita."
+    " produzca la canción gratis."
 )
 st.divider()
 
@@ -47,38 +47,40 @@ if audio_final:
 
     if st.button("✨ Transformar con IA (Servidor Gratis)"):
         with st.spinner(
-            "Enviando a la supercomputadora gratuita de Hugging Face..."
+            "Conectando con la supercomputadora de Hugging Face (esto toma unos"
+            " segundos)..."
         ):
             try:
-                # Guardamos el audio temporalmente para procesarlo
+                # Guardamos el audio temporalmente
                 with tempfile.NamedTemporaryFile(
                     delete=False, suffix=".wav"
                 ) as tmp:
                     tmp.write(audio_final.getvalue())
                     tmp_path = tmp.name
 
-                # Conexión directa a MusicGen en Hugging Face
+                # Conexión directa a MusicGen
                 client = Client("facebook/MusicGen")
 
+                # Dejamos que Gradio elija la ruta automáticamente sin api_name
                 result = client.predict(
-                    model="melody",
-                    text_prompt=estilo,
-                    audio_input=handle_file(tmp_path),
-                    duration=8,
-                    api_name="/predict",
+                    "melody",  # Tipo de modelo
+                    estilo,  # Descripción en texto
+                    handle_file(tmp_path),  # Audio de tu ukelele
+                    8,  # Duración en segundos
                 )
 
                 # Limpieza del archivo temporal
-                os.remove(tmp_path)
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
 
-                # Obtenemos la ruta del audio generado
-                audio_path = result[1] if isinstance(result, tuple) else result
+                # Extraemos el archivo de audio de la respuesta
+                if isinstance(result, (tuple, list)):
+                    audio_path = result[1] if len(result) > 1 else result[0]
+                else:
+                    audio_path = result
 
                 st.success("🎉 ¡Tu canción producida por IA está lista!")
                 st.audio(audio_path)
 
             except Exception as e:
-                st.error(
-                    "El servidor gratuito puede estar congestionado en este"
-                    f" momento. Intenta de nuevo en un par de segundos. Error: {e}"
-                )
+                st.error(f"Hubo un detalle al conectar con el servidor: {e}")
