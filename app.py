@@ -32,7 +32,10 @@ if audio_grabado:
 
             # Calcular los Beats Per Minute (BPM)
             tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-            bpm_estimado = int(np.round(tempo))
+
+            # Extraer el dato de forma segura (compatible con cualquier versión)
+            bpm_valor = float(np.atleast_1d(tempo)[0])
+            bpm_estimado = int(np.round(bpm_valor))
 
             st.divider()
 
