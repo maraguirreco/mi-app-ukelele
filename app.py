@@ -47,40 +47,62 @@ if audio_final:
 
     if st.button("✨ Transformar con IA (Servidor Gratis)"):
         with st.spinner(
-            "Conectando con la supercomputadora de Hugging Face (esto toma unos"
-            " segundos)..."
+            "Conectando con la supercomputadora de Hugging Face (esto puede"
+            " tomar 30-60 segundos)..."
         ):
             try:
-                # Guardamos el audio temporalmente
+                # Guardar el audio temporalmente
                 with tempfile.NamedTemporaryFile(
                     delete=False, suffix=".wav"
                 ) as tmp:
                     tmp.write(audio_final.getvalue())
                     tmp_path = tmp.name
 
-                # Conexión directa a MusicGen
+                # Conexión al modelo de producción musical
                 client = Client("facebook/MusicGen")
 
-                # Dejamos que Gradio elija la ruta automáticamente sin api_name
                 result = client.predict(
-                    "melody",  # Tipo de modelo
-                    estilo,  # Descripción en texto
+                    "melody",  # Modelo con melodía
+                    estilo,  # Instrucción en texto
                     handle_file(tmp_path),  # Audio de tu ukelele
-                    8,  # Duración en segundos
+                    8,  # Duración del demo
                 )
 
-                # Limpieza del archivo temporal
+                # Limpieza del archivo temporal de entrada
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
 
-                # Extraemos el archivo de audio de la respuesta
-                if isinstance(result, (tuple, list)):
-                    audio_path = result[1] if len(result) > 1 else result[0]
-                else:
+                # Procesamiento ultra-seguro de la respuesta
+                audio_path = None
+
+                if isinstance(result, (list, tuple)):
+                    # Buscamos el archivo de audio generado
+                    for item in result:
+                        if isinstance(item, str) and (
+                            item.endswith(".wav")
+                            or item.endswith(".mp3")
+                            or item.endswith(".flac")
+                        ):
+                            audio_path = item
+                            break
+                    if not audio_path and len(result) > 0:
+                        audio_path = result[-1]
+                elif isinstance(result, str):
                     audio_path = result
 
-                st.success("🎉 ¡Tu canción producida por IA está lista!")
-                st.audio(audio_path)
+                # Verificación final
+                if audio_path and os.path.exists(str(audio_path)):
+                    st.success("🎉 ¡Tu canción producida por IA está lista!")
+                    st.audio(audio_path)
+                else:
+                    st.warning(
+                        "⚠️ El servidor gratuito está despertando o muy"
+                        " ocupado en este momento. Por favor presiona el botón"
+                        " de nuevo en 5 segundos."
+                    )
 
             except Exception as e:
-                st.error(f"Hubo un detalle al conectar con el servidor: {e}")
+                st.error(
+                    "El servidor está saturado. Intenta presionar el botón de"
+                    f" nuevo. Detalle: {e}"
+                )
