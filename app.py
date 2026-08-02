@@ -1,27 +1,18 @@
 import os
-import replicate
+import tempfile
+from gradio_client import Client, handle_file
 import streamlit as st
 
-# Configuración de página
-st.set_page_config(page_title="UkeFlow AI", page_icon="🤖")
+st.set_page_config(page_title="UkeFlow AI Free", page_icon="🤖")
 
-st.title("🤖 UkeFlow: Edición IA")
+st.title("🤖 UkeFlow: Edición IA (Gratis)")
 st.write(
-    "Graba tu ukelele o sube un archivo de audio, escribe lo que imaginas y"
-    " deja que la IA produzca la canción."
+    "Graba o sube tu ukelele, escribe lo que imaginas y deja que la IA produce"
+    " la canción gratis."
 )
 st.divider()
 
-# Verificar que la llave de la API esté configurada
-if "REPLICATE_API_TOKEN" not in st.secrets:
-    st.error("⚠️ Falta configurar la llave secreta de Replicate en Streamlit.")
-    st.stop()
-else:
-    os.environ["REPLICATE_API_TOKEN"] = st.secrets["REPLICATE_API_TOKEN"]
-
-# Paso 1: Captura de Audio (Dos opciones con pestañas)
 st.header("1. Captura tu ukelele")
-
 tab1, tab2 = st.tabs(["🎤 Grabar con micrófono", "📁 Subir archivo de audio"])
 
 audio_final = None
@@ -35,18 +26,16 @@ with tab1:
 
 with tab2:
     audio_subido = st.file_uploader(
-        "Selecciona un audio desde tu dispositivo (WAV, MP3, M4A, Ogg):",
-        type=["wav", "mp3", "m4a", "ogg", "flac"],
+        "Selecciona un audio desde tu dispositivo:",
+        type=["wav", "mp3", "m4a", "ogg"],
     )
     if audio_subido:
         audio_final = audio_subido
 
-# Si la app detecta un audio (sea grabado o subido), continúa la producción
 if audio_final:
-    st.success("¡Audio listo para el estudio!")
+    st.success("¡Audio listo!")
     st.audio(audio_final)
 
-    # Paso 2: El Prompt (La instrucción)
     st.header("2. ¿Cómo quieres que suene?")
     estilo = st.text_area(
         "Describe la producción que imaginas:",
@@ -56,26 +45,40 @@ if audio_final:
         ),
     )
 
-    # Paso 3: Magia IA
-    if st.button("✨ Transformar con IA"):
+    if st.button("✨ Transformar con IA (Servidor Gratis)"):
         with st.spinner(
-            "La Inteligencia Artificial está en el estudio componiendo (esto"
-            " puede tardar 1 o 2 minutos)..."
+            "Enviando a la supercomputadora gratuita de Hugging Face..."
         ):
             try:
-                # Se envía el audio (grabado o subido) al modelo MusicGen-Melody de Meta
-                output = replicate.run(
-                    "meta/musicgen-melody:7a76a8258b23fae65c5a22debb8841d1d7e816b75c2f24218cd2bd8573787906",
-                    input={
-                        "prompt": estilo,
-                        "melody": audio_final,  # Pasa el audio seleccionado
-                        "duration": 8,  # Duración del audio generado en segundos
-                        "temperature": 1.05,
-                    },
+                # Guardamos el audio temporalmente en disco
+                with tempfile.NamedTemporaryFile(
+                    delete=False, suffix=".wav"
+                ) as tmp:
+                    tmp.write(audio_final.getvalue())
+                    tmp_path = tmp.name
+
+                # Nos conectamos al servidor gratuito de MusicGen
+                client = Client("facebook/MusicGen")
+
+                result = client.predict(
+                    model="melody",
+                    text_prompt=estilo,
+                    audio_input=handle_file(tmp_path),
+                    duration=8,
+                    api_name="/predict",
                 )
 
+                # Limpieza del archivo temporal
+                os.remove(tmp_path)
+
+                # result devuelve la ruta del audio generado
+                audio_path = result[1] if isinstance(result, tuple) else result
+
                 st.success("🎉 ¡Tu canción producida por IA está lista!")
-                st.audio(output)
+                st.audio(audio_path)
 
             except Exception as e:
-                st.error(f"Ups, ocurrió un error en el estudio: {e}")
+                st.error(
+                    "El servidor gratuito está algo congestionado en este"
+                    f" momento. Error: {e}"
+                )
